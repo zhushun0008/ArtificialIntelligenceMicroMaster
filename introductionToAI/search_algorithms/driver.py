@@ -8,6 +8,9 @@ import sys
 import resource
 import time
 import codecs
+import Queue as Q
+
+
 #### SKELETON CODE ####
 
 ## The Class that Represents the Puzzle
@@ -165,7 +168,8 @@ class PuzzleState(object):
 
 def writeOutput(statistics_dict):
     ### Student Code Goes here
-    key_name_list = ["path_to_goal", "cost_of_path", "nodes_expanded", "search_depth", "max_search_depth", "running_time", "max_ram_usage"]
+    key_name_list = ["path_to_goal", "cost_of_path", "nodes_expanded", "search_depth", "max_search_depth",
+                     "running_time", "max_ram_usage"]
     with codecs.open('output.txt', "w+") as fw:
         for temp_key in key_name_list:
             temp_value = statistics_dict.get(temp_key)
@@ -178,15 +182,17 @@ def writeOutput(statistics_dict):
             fw.write("\n")
 
 
-
 def bfs_search(initial_state):
     """BFS search"""
 
     ### STUDENT CODE GOES HERE ###
     fifo_queue = []
     fifo_queue.insert(0, initial_state)
+    fifo_queue_set = set()
+    str_init_state = ",".join(map(str, initial_state.config))
+    fifo_queue_set.add(str_init_state)
     level_dict = {}
-    level_dict[",".join(map(str, initial_state.config))] = 0
+    level_dict[str_init_state] = 0
     max_search_depth = 0
     explored = set()
     num_node_expand = 0
@@ -194,10 +200,11 @@ def bfs_search(initial_state):
     statistics_dict = {}
     while (len(fifo_queue) > 0):
         new_initial_state = fifo_queue.pop()
-        parent = ",".join(map(str, new_initial_state.config))
+        str_new_init_state = ",".join(map(str, new_initial_state.config))
+        fifo_queue_set.remove(str_new_init_state)
         if test_goal(new_initial_state):
             temp_state = new_initial_state
-            while(temp_state.parent):
+            while (temp_state.parent):
                 path_to_goal.insert(0, temp_state.action)
                 temp_state = temp_state.parent
             statistics_dict["cost_of_path"] = new_initial_state.cost
@@ -206,14 +213,15 @@ def bfs_search(initial_state):
             statistics_dict["path_to_goal"] = path_to_goal
             statistics_dict["max_search_depth"] = max_search_depth
             return statistics_dict
-        explored.add(parent)
+        explored.add(str_new_init_state)
 
         new_initial_state.expand()
         num_node_expand += 1
         # print("\n")
         # print("num_node_expand: ", num_node_expand)
         for child in new_initial_state.children:
-            if (",".join(map(str, child.config)) not in explored and child not in fifo_queue):
+            child_state_str = ",".join(map(str, child.config))
+            if (child_state_str not in explored) and (child_state_str not in fifo_queue_set):
                 child.parent = new_initial_state
                 level_dict[",".join(map(str, child.config))] = level_dict[",".join(map(str, child.parent.config))] + 1
                 if (max_search_depth < level_dict[",".join(map(str, child.config))]):
@@ -221,6 +229,7 @@ def bfs_search(initial_state):
                 # if (test_goal(child)):
                 #     return True
                 fifo_queue.insert(0, child)
+                fifo_queue_set.add(child_state_str)
                 # print(",".join(map(str, fifo_queue[0].config)))
 
 
@@ -228,58 +237,137 @@ def dfs_search(initial_state):
     """DFS search"""
 
     ### STUDENT CODE GOES HERE ###
-
     stack = []
     stack.append(initial_state)
+    stack_set = set()
+    str_init_state = ",".join(map(str, initial_state.config))
+    stack_set.add(str_init_state)
     explored = set()
+
+    level_dict = {}
+    level_dict[str_init_state] = 0
+    max_search_depth = 0
     num_node_expand = 0
     path_to_goal = []
     statistics_dict = {}
-    while (len(stack) > 0):
+    while len(stack) > 0:
         new_initial_state = stack.pop()
-        parent = ",".join(map(str, new_initial_state.config))
+        str_new_init_config = ",".join(map(str, new_initial_state.config))
+        stack_set.remove(str_new_init_config)
+        # print("pop:  " + str_new_init_config)
+
         if test_goal(new_initial_state):
             temp_state = new_initial_state
-            while(temp_state.parent):
+            while (temp_state.parent):
                 path_to_goal.insert(0, temp_state.action)
                 temp_state = temp_state.parent
             statistics_dict["cost_of_path"] = new_initial_state.cost
             statistics_dict["nodes_expanded"] = num_node_expand
-            statistics_dict["search_depth"] = len(path_to_goal)
+            statistics_dict["search_depth"] = level_dict[",".join(map(str, new_initial_state.config))]
             statistics_dict["path_to_goal"] = path_to_goal
-            statistics_dict["max_search_depth"] = len(path_to_goal) + 1
+            statistics_dict["max_search_depth"] = max_search_depth
             return statistics_dict
-        explored.add(parent)
 
+        explored.add(str_new_init_config)
         new_initial_state.expand()
         num_node_expand += 1
-        # print("\n")
         # print("num_node_expand: ", num_node_expand)
-        for child in new_initial_state.children:
-            if (",".join(map(str, child.config)) not in explored and child not in stack):
+        # reverse-UDLR order
+        # print("\n")
+        for child_index in reversed(range(len(new_initial_state.children))):
+            child = new_initial_state.children[child_index]
+            child_state_str = ",".join(map(str, child.config))
+            if (child_state_str not in explored) and (child_state_str not in stack_set):
+                # print("push: " + ",".join(map(str, child.config)))
                 child.parent = new_initial_state
+                level_dict[child_state_str] = level_dict[",".join(map(str, new_initial_state.config))] + 1
+
+                # print("({0}, {1})".format(child_state_str, level_dict[",".join(map(str, child.config))]))
+                if (max_search_depth < level_dict[child_state_str]):
+                    max_search_depth = level_dict[child_state_str]
                 # if (test_goal(child)):
                 #     return True
                 stack.append(child)
-                # print(",".join(map(str, fifo_queue[0].config)))
+                stack_set.add(child_state_str)
 
 
 def A_star_search(initial_state):
     """A * search"""
 
     ### STUDENT CODE GOES HERE ###
+    priority_queue = Q.PriorityQueue()
+    priority_queue.put((calculate_total_cost(initial_state), initial_state))
+    priority_queue_set = set()
+    str_init_state = ",".join(map(str, initial_state.config))
+    priority_queue_set.add(str_init_state)
+    explored = set()
+
+    level_dict = {}
+    level_dict[str_init_state] = 0
+    max_search_depth = 0
+    num_node_expand = 0
+    path_to_goal = []
+    statistics_dict = {}
+    while not priority_queue.empty():
+        new_initial_state = priority_queue.get()[1]
+        str_new_init_config = ",".join(map(str, new_initial_state.config))
+        priority_queue_set.remove(str_new_init_config)
+        explored.add(str_new_init_config)
+        # print("pop:  " + str_new_init_config)
+
+        if test_goal(new_initial_state):
+            temp_state = new_initial_state
+            while (temp_state.parent):
+                path_to_goal.insert(0, temp_state.action)
+                temp_state = temp_state.parent
+            statistics_dict["cost_of_path"] = new_initial_state.cost
+            statistics_dict["nodes_expanded"] = num_node_expand
+            statistics_dict["search_depth"] = level_dict[",".join(map(str, new_initial_state.config))]
+            statistics_dict["path_to_goal"] = path_to_goal
+            statistics_dict["max_search_depth"] = max_search_depth
+            return statistics_dict
+
+        new_initial_state.expand()
+        num_node_expand += 1
+        # print("num_node_expand: ", num_node_expand)
+        # reverse-UDLR order
+        # print("\n")
+        for child in new_initial_state.children:
+            child_state_str = ",".join(map(str, child.config))
+            if (child_state_str not in explored) and (child_state_str not in priority_queue_set):
+                # print("push: " + ",".join(map(str, child.config)))
+                child.parent = new_initial_state
+                level_dict[child_state_str] = level_dict[",".join(map(str, new_initial_state.config))] + 1
+
+                # print("({0}, {1})".format(child_state_str, level_dict[",".join(map(str, child.config))]))
+                if (max_search_depth < level_dict[child_state_str]):
+                    max_search_depth = level_dict[child_state_str]
+                # if (test_goal(child)):
+                #     return True
+                priority_queue.put((calculate_total_cost(child), child))
+                priority_queue_set.add(child_state_str)
 
 
 def calculate_total_cost(state):
     """calculate the total estimated cost of a state"""
 
     ### STUDENT CODE GOES HERE ###
+    gn_cost = state.cost
+    hn_cost = 0.0
+    for i in xrange(len(state.config)):
+        hn_cost += calculate_manhattan_dist(i, state.config[i], state.n)
+    return gn_cost + hn_cost
 
 
 def calculate_manhattan_dist(idx, value, n):
     """calculate the manhattan distance of a tile"""
 
     ### STUDENT CODE GOES HERE ###
+    idx_row = idx / n
+    idx_col = idx % n
+    value_row = value / n
+    value_col = value % n
+    return int(abs(value_row - idx_row) + abs(value_col - idx_col))
 
 
 def test_goal(puzzle_state):
@@ -313,12 +401,19 @@ def main():
         writeOutput(statistics_dict)
 
     elif sm == "dfs":
-
-        dfs_search(hard_state)
-
+        start_time = time.time()
+        statistics_dict = dfs_search(hard_state)
+        end_time = time.time()
+        statistics_dict["running_time"] = end_time - start_time
+        statistics_dict["max_ram_usage"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        writeOutput(statistics_dict)
     elif sm == "ast":
-
-        A_star_search(hard_state)
+        start_time = time.time()
+        statistics_dict = A_star_search(hard_state)
+        end_time = time.time()
+        statistics_dict["running_time"] = end_time - start_time
+        statistics_dict["max_ram_usage"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+        writeOutput(statistics_dict)
 
     else:
 
